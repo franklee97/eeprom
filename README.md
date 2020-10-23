@@ -260,7 +260,7 @@ This is where an EEPROM reset function would be present.
   - To get the size of input parameter, I used the `strlen` function, which might not be the best option in the real world as EEPROM data does not have any '\0' byte to help indicate the size. For a real world scenario, I would have resorted to different way of determining the size. One idea is to continuously read the input buf until I hit a `0xFF` value, which I know means "reset state."
 - I could have used bit-shifting rather than memcpy to make my functions more efficient (This is for Case #2~4).
 - Rather than placing my mutex_lock/unlock inside my ll functions, I added them inside each Cases, before I start my reading/writing sequences. This is to ensure that all the data are read before another consumer can start reading, rather than other consumer accidentally starting to read the data after I finish reading one page.
-- One of the reasons why I think I am observing two mutex locks back to back is because of the debug mode. Rather than calling the `pthread_mutex_lock` or `pthread_mutex_unlock` functions, I call a helper function that calls these functions. Maybe within that short period of program counter moving to that function, another thread might be starting its own mutex lock.
+- One of the reasons why I think I am observing two mutex locks back to back is because of the debug mode. Rather than calling the `pthread_mutex_lock` or `pthread_mutex_unlock` functions, I call a helper function that calls these functions. Maybe within that short period of time the program counter moves to that function, another thread might be starting its own mutex lock.
 
 
 
