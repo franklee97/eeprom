@@ -20,36 +20,77 @@ int main() {
     
     
     printf("----Starting mutex test----\n");
-    // Creating two threads that will be doing read/write on their own 
-    pthread_t tid[2];
-    int i;
-    for (i = 0; i < 2; i++) {
-        pthread_create(&tid[i], NULL, thread_func, (void *)(intptr_t)i);
-    }
+    // Creating four threads that will be doing read/write on their own 
+    pthread_t tid[4];
+    pthread_create(&tid[0], NULL, thread_func_0, (void *)(intptr_t)0);
+    pthread_create(&tid[1], NULL, thread_func_1, (void *)(intptr_t)1);
+    pthread_create(&tid[2], NULL, thread_func_2, (void *)(intptr_t)2);
+    pthread_create(&tid[3], NULL, thread_func_3, (void *)(intptr_t)3);
     
-    
+    // Join the threads once they are done
     pthread_join(tid[0], NULL);
     pthread_join(tid[1], NULL);
-    //while (1) {}    // Wait until mutex finishes
-
+    pthread_join(tid[2], NULL);
+    pthread_join(tid[3], NULL);
+    
     return 0;
 }
 
-int t_count[2];
+int t_count[4];
 
-void *thread_func(void *vargp) {
+void *thread_func_0(void *vargp) {
     int myid = (intptr_t) vargp;     // Thread id
     char out[256];
-    
-    // Continue until both threads have done 5 read/writes
-    while (t_count[0] < 5 || t_count[1] < 5) {
-        printf("Thread %d read #%d start.\n", myid, t_count[myid]);
+    int j = 0;
+    // Do 5 reads
+    while (j < 5) {
+        printf("Thread %d read #%d start.\n", myid, j + 1);
         eeprom_read(0, 32, out);
-        printf("Thread %d read #%d end.\n", myid, t_count[myid]);
-        printf("Thread %d write #%d start.\n", myid, t_count[myid]);
-        eeprom_write(100, 32, out);
-        printf("Thread %d write #%d end.\n", myid, t_count[myid]);
-        t_count[myid]++;
+        printf("Thread %d read #%d end.\n", myid, j + 1);
+        j++;
+    }
+    return NULL;
+}
+
+void *thread_func_1(void *vargp) {
+    int myid = (intptr_t) vargp;     // Thread id
+    char out[256];
+    int j = 0;
+    // Do 5 reads
+    while (j < 5) {
+        printf("Thread %d read #%d start.\n", myid, j + 1);
+        eeprom_read(0, 32, out);
+        printf("Thread %d read #%d end.\n", myid, j + 1);
+        j++;
+    }
+    return NULL;
+}
+
+void *thread_func_2(void *vargp) {
+    int myid = (intptr_t) vargp;     // Thread id
+    char str[32] = "I love rock n roll, so put anoth";
+    int j = 0;
+    // Continue until all threads have done 5 writes
+    while (j < 5) {
+        printf("Thread %d write #%d start.\n", myid, j + 1);
+        eeprom_write(0, 32, str);
+        printf("Thread %d write #%d end.\n", myid, j + 1);
+        j++;
+        
+    }
+    return NULL;
+}
+
+void *thread_func_3(void *vargp) {
+    int myid = (intptr_t) vargp;     // Thread id
+    char str[32] = "I love rock n roll, so put anoth";
+    int j = 0;
+    // Continue until all threads have done 5 writes
+    while (j < 5) {
+        printf("Thread %d write #%d start.\n", myid, j + 1);
+        eeprom_write(0, 32, str);
+        printf("Thread %d write #%d end.\n", myid, j + 1);
+        j++;
         
     }
     return NULL;
@@ -167,8 +208,8 @@ void eeprom_write_test() {
     
     // eeprom_write Case #3
     printf("----eeprom_write Case #3----\n");
-    memcpy(out, str, 18);
-    eeprom_write(248, 18, out);
+    memcpy(out, str, 8);
+    eeprom_write(248, 8, out);
     printf("Offset:248, Size:18 --->%s\n\n", out);
     memset(out, 0, 255);
     

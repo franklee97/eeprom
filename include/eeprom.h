@@ -22,4 +22,5 @@ int eeprom_read(uint32_t offset, int size, char *buf);
 int eeprom_write(uint32_t offset, int size, char *buf);
 void eeprom_reset();
 int eeprom_param_check(uint32_t offset, int size);
-
+void mutex_lock();
+void mutex_unlock();

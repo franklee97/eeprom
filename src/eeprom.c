@@ -8,8 +8,13 @@
 
 #include "../include/eeprom.h"
 
+#define DEBUG_MODE 0
+
+
 // Global mem_mutex that is being used by both eeprom_read and eeprom_write
 pthread_mutex_t mem_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+
 
 /*
     This function reads from EEPROM memory and stores the read values
@@ -51,12 +56,12 @@ int eeprom_read(uint32_t offset, int size, char *buf) {
         // Because size is a multiple of PAGE_SIZE, size/PAGE_SIZE is number of page reads
         num_page = size/PAGE_SIZE;
         // Lock memory mutex
-        pthread_mutex_lock(&mem_mutex);
+        mutex_lock(&mem_mutex);
         for (i = 0; i < num_page; i++) {
             ll_read(offset + i*PAGE_SIZE, buf + i*PAGE_SIZE); // Copying the read bytes into buf
         }
         // Unlock memory mutex
-        pthread_mutex_unlock(&mem_mutex);
+        mutex_unlock(&mem_mutex);
     }
     
     // Case #2: offset is multiple of PAGE_SIZE and size is not multiple of PAGE_SIZE
@@ -65,14 +70,14 @@ int eeprom_read(uint32_t offset, int size, char *buf) {
         // size/PAGE_SIZE
         num_page = size/PAGE_SIZE;
         // Lock memory mutex
-        pthread_mutex_lock(&mem_mutex);
+        mutex_lock(&mem_mutex);
         for (i = 0; i < num_page; i++) {
             ll_read(offset + i*PAGE_SIZE, buf + i*PAGE_SIZE); // Copying the read bytes into buf
         }
         // Reading the remaining bytes
         ll_read((i+offset/PAGE_SIZE)*PAGE_SIZE, temp);    // Reading entire page
         // Unlock memory mutex
-        pthread_mutex_unlock(&mem_mutex);
+        mutex_unlock(&mem_mutex);
         memcpy(buf + i*PAGE_SIZE, temp, size%PAGE_SIZE);  // Storing only desired bytes from the page
         memset(temp, 0, PAGE_SIZE-1);    // Clear temp array
     }
@@ -80,7 +85,7 @@ int eeprom_read(uint32_t offset, int size, char *buf) {
     // Case #3: offset is not a multiple of PAGE_SIZE and offset+size is multiple of PAGE_SIZE
     else if (offset % PAGE_SIZE != 0 && (offset+size) % PAGE_SIZE == 0) {
         // Lock memory mutex
-        pthread_mutex_lock(&mem_mutex);
+        mutex_lock(&mem_mutex);
         ll_read((offset/PAGE_SIZE)*PAGE_SIZE, temp);  // Reading the floor(offset)'th page
         memcpy(buf, temp+(offset%PAGE_SIZE), PAGE_SIZE-(offset%PAGE_SIZE));  // Storing only desired bytes
         memset(temp, 0, PAGE_SIZE-1);    // Clear temp array
@@ -94,13 +99,13 @@ int eeprom_read(uint32_t offset, int size, char *buf) {
             j++;
         }
         // Unlock memory mutex
-        pthread_mutex_unlock(&mem_mutex);
+        mutex_unlock(&mem_mutex);
     }
     
     // Case #4: offset is not multiple of PAGE_SIZE and offset+size is not multiple of PAGE_SIZE
     else if (offset % PAGE_SIZE != 0 && size % PAGE_SIZE != 0) {
         // Lock memory mutex
-        pthread_mutex_lock(&mem_mutex);
+        mutex_lock(&mem_mutex);
         // Same behavior as above to read first couple bytes
         ll_read((offset/PAGE_SIZE)*PAGE_SIZE, temp);
         memcpy(buf, temp+(offset%PAGE_SIZE), PAGE_SIZE-(offset%PAGE_SIZE));
@@ -118,7 +123,7 @@ int eeprom_read(uint32_t offset, int size, char *buf) {
         // Do one more page read after where we left off
         ll_read(j*PAGE_SIZE, temp);
         // Unlock memory mutex
-        pthread_mutex_unlock(&mem_mutex);
+        mutex_unlock(&mem_mutex);
         // Storing only desired bytes
         memcpy(buf+(i*PAGE_SIZE)+(PAGE_SIZE-(offset%PAGE_SIZE)), temp, (offset+size)%PAGE_SIZE);
         memset(temp, 0, PAGE_SIZE-1);
@@ -151,7 +156,6 @@ int eeprom_read(uint32_t offset, int size, char *buf) {
 */
 int eeprom_write(uint32_t offset, int size, char *buf) {
 
-    
 
     // Checking for input validity
     int param_check = eeprom_param_check(offset, size);
@@ -161,8 +165,6 @@ int eeprom_write(uint32_t offset, int size, char *buf) {
     // Checking the input buf size
     if (strlen(buf) != size) {
         printf("ERROR: Size of buf is different than the amount of size to be written!\n");
-        // Unlock memory mutex
-        pthread_mutex_unlock(&mem_mutex);
         return -4;
     }
     
@@ -180,12 +182,12 @@ int eeprom_write(uint32_t offset, int size, char *buf) {
         // Because size is a multiple of PAGE_SIZE, size/PAGE_SIZE is number of page writes
         num_page = size/PAGE_SIZE;
         // Lock memory mutex
-        pthread_mutex_lock(&mem_mutex);
+        mutex_lock(&mem_mutex);
         for (i = 0; i < num_page; i++) {
             ll_write(offset + i*PAGE_SIZE, buf + i*PAGE_SIZE); // Write the bytes
         }
         // Unlock memory mutex
-        pthread_mutex_unlock(&mem_mutex);
+        mutex_unlock(&mem_mutex);
     }
     
     // Case #2: offset is multiple of PAGE_SIZE and size is not multiple of PAGE_SIZE
@@ -194,23 +196,23 @@ int eeprom_write(uint32_t offset, int size, char *buf) {
         // size/PAGE_SIZE
         num_page = size/PAGE_SIZE;
         // Lock memory mutex
-        pthread_mutex_lock(&mem_mutex);
+        mutex_lock(&mem_mutex);
         for (i = 0; i < num_page; i++) {
             ll_write(offset + i*PAGE_SIZE, buf + i*PAGE_SIZE); // Write the bytes
         }
         // Writing the remaining bytes
         ll_read((i+offset/PAGE_SIZE)*PAGE_SIZE, temp);      // Read entire page to temp
-        // Unlock memory mutex
-        pthread_mutex_unlock(&mem_mutex);
         memcpy(temp, buf + i*PAGE_SIZE, size%PAGE_SIZE);    // Overwriting portion of temp with remaining bytes
         ll_write((i+offset/PAGE_SIZE)*PAGE_SIZE, temp);     // Copy the updated page back
+        // Unlock memory mutex
+        mutex_unlock(&mem_mutex);
         memset(temp, 0, PAGE_SIZE-1);    // Clear temp array
     }
     
     // Case #3: offset is not a multiple of PAGE_SIZE and offset+size is multiple of PAGE_SIZE
     else if (offset % PAGE_SIZE != 0 && (offset+size) % PAGE_SIZE == 0) {
         // Lock memory mutex
-        pthread_mutex_lock(&mem_mutex);
+        mutex_lock(&mem_mutex);
         ll_read((offset/PAGE_SIZE)*PAGE_SIZE, temp);    // Reading the floor(offset)'th page
         memcpy(temp+(offset%PAGE_SIZE), buf, PAGE_SIZE-(offset%PAGE_SIZE));     // Overwriting portion of temp
         ll_write((offset/PAGE_SIZE)*PAGE_SIZE, temp);   // Copy the updated page back
@@ -225,13 +227,13 @@ int eeprom_write(uint32_t offset, int size, char *buf) {
             j++;
         }
         // Unlock memory mutex
-        pthread_mutex_unlock(&mem_mutex);
+        mutex_unlock(&mem_mutex);
     }
     
     // Case #4: offset is not multiple of PAGE_SIZE and offset+size is not multiple of PAGE_SIZE
     else if (offset % PAGE_SIZE != 0 && size % PAGE_SIZE != 0) {
         // Lock memory mutex
-        pthread_mutex_lock(&mem_mutex);
+        mutex_lock(&mem_mutex);
         // Same behavior as above to write first couple bytes
         ll_read((offset/PAGE_SIZE)*PAGE_SIZE, temp);
         memcpy(temp+(offset%PAGE_SIZE), buf, PAGE_SIZE-(offset%PAGE_SIZE));
@@ -249,13 +251,15 @@ int eeprom_write(uint32_t offset, int size, char *buf) {
         
         // Do one more page write after where we left off
         ll_read(j*PAGE_SIZE, temp);
-        // Unlock memory mutex
-        pthread_mutex_unlock(&mem_mutex);
+        
         // Storing only desired bytes
         memcpy(temp, buf+(i*PAGE_SIZE)+(PAGE_SIZE-(offset%PAGE_SIZE)), (offset+size)%PAGE_SIZE);
         ll_write(j*PAGE_SIZE, temp);        // Updating the new page
+        // Unlock memory mutex
+        mutex_unlock(&mem_mutex);
         memset(temp, 0, PAGE_SIZE-1);
     }
+    
     
     return 0;
     
@@ -270,26 +274,51 @@ void eeprom_reset() {
 }
 
 
+/*
+    This function checks the validity of the parameters.
+    
+    @return: 0 for valid input
+    @return: -1 for invalid offset
+    @return: -2 for invalid size
+    @return: -3 for index out of bound
+*/
+    
 int eeprom_param_check(uint32_t offset, int size) {
     // Checking for input validity
     if (offset > EEPROM_SIZE) {
         printf("ERROR: Invalid offset value!\n");
-        // Unlock memory mutex
-        pthread_mutex_unlock(&mem_mutex);
         return -1;
     }
     if (size <= 0) {
         printf("ERROR: Invalid size value!\n");
-        // Unlock memory mutex
-        pthread_mutex_unlock(&mem_mutex);
         return -2;
     }
     // Checking for index out of bound
     if (offset + size > EEPROM_SIZE) {
         printf("ERROR: Index out of bound!\n"); 
         // Unlock memory mutex
-        pthread_mutex_unlock(&mem_mutex);
         return -3;
     }
     return 0;
+}
+
+/*
+    This function calls pthread_mutex_lock and prints debug
+    statement if DEBUG_MODE is 1.
+*/
+void mutex_lock() {
+    pthread_mutex_lock(&mem_mutex);
+    if (DEBUG_MODE == 1) {
+        printf("Mutex locked\n");
+    }
+}
+/*
+    This function calls pthread_mutex_unlock and prints debug
+    statement if DEBUG_MODE is 1.
+*/
+void mutex_unlock() {
+    pthread_mutex_unlock(&mem_mutex);
+    if (DEBUG_MODE == 1) {
+        printf("Mutex unlocked\n");
+    }
 }

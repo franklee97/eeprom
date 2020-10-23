@@ -133,60 +133,109 @@ The string to be written is defined by me. To test each cases, I used `memcpy` t
 
 This function is meant to reset the EEPROM. It calls a lowlevel reset function, which resets the EEPROM by slightly raising the voltage above normal "HIGH" level. I did not implement this function as this would be a bit outside the scope of the prompt.
 
+### eeprom_param_check ###
+`int eeprom_param_check(uint32_t offset, int size);`
+This function checks the parameter validity.
+
+### mutex_lock / mutex_unlock ###
+`void mutex_lock();`
+`void mutex_unlock();`
+These functions call `pthread_mutex_lock()` and `pthread_mutex_unlock()` functions. If `DEBUG_MODE` is enabled, it also prints to the console.
+
+
 ### Using mutexes to limit concurrent hardware access ###
-Because this code must mimic EEPROM behavior, I needed to incorporate the case of multiple consumers trying to access the resource. To limit the access to the hardware while an operation is ongoing, I used mutexes. As soon as `eeprom_read()` or `eeprom_write()` function would start, it would lock a global, common(between read/write) mutex so another consumer cannot access it. It then unlocks the mutex right before the function exits, either via a successful read/write or via an error. My code has common mutex, meaning while consumer A is reading OR writing, consumer B cannot do either operation.
+Because this code must mimic EEPROM behavior, I needed to incorporate the case of multiple consumers trying to access the resource. To limit the access to the hardware while an operation is ongoing, I used mutexes. Inside `eeprom_read()` and `eeprom_write()` functions, as soon as the consumer would start reading/writing from EEPROM, it would lock the mutex. After the read/write is complete, it would then unlock the mutex. This does NOT mean the mutex is locked and unlocked after every successful page read/rwrite.. It would lock for the entire duration of necessary page reads/writes. My code has common mutex, meaning while consumer A is reading OR writing, consumer B cannot do either operation.
 
 ### Testing concurrent hardware access ###
-To test the concurrent access, I utilized multithreading. First I created two threads that does the same thing: read from one place and write to another place. Then, using print statements right before and right after the functions, I observed the behavior. Below is an example of the test:
+To test the concurrent access, I utilized multithreading. First I created four threads with two threads doing reads and two threads going writes. In `eeprom.c`, if `DEBUG_MODE` is 1, then it will print whenever mutex is locked or unlocked. The test is supposed to finish as soon as all threads have completed 5 of their own operation. Below is an example of the test output:
+
 
 ```
 ----Starting mutex test----
-Thread 1 read #0 start.
-Thread 0 read #0 start.
-Thread 1 read #0 end.
-Thread 1 write #0 start.
-Thread 1 write #0 end.
 Thread 1 read #1 start.
+Mutex locked
+Thread 3 write #1 start.
+Thread 2 write #1 start.
+Mutex unlocked
 Thread 1 read #1 end.
-Thread 1 write #1 start.
-Thread 0 read #0 end.
-Thread 0 write #0 start.
-Thread 0 write #0 end.
-Thread 0 read #1 start.
-Thread 0 read #1 end.
-Thread 0 write #1 start.
-Thread 0 write #1 end.
-Thread 0 read #2 start.
-Thread 0 read #2 end.
-Thread 0 write #2 start.
-Thread 0 write #2 end.
-Thread 0 read #3 start.
-Thread 0 read #3 end.
-Thread 0 write #3 start.
-Thread 0 write #3 end.
-Thread 0 read #4 start.
-Thread 0 read #4 end.
-Thread 0 write #4 start.
-Thread 0 write #4 end.
-Thread 1 write #1 end.
 Thread 1 read #2 start.
-Thread 0 read #5 start.
+Mutex locked
+Mutex unlocked
 Thread 1 read #2 end.
-Thread 1 write #2 start.
-Thread 1 write #2 end.
 Thread 1 read #3 start.
+Mutex locked
+Mutex unlocked
+Thread 3 write #1 end.
+Thread 3 write #2 start.
+Mutex locked
+Thread 0 read #1 start.
+Mutex unlocked
+Thread 3 write #2 end.
+Thread 3 write #3 start.
+Mutex locked
+Mutex unlocked
+Thread 0 read #1 end.
+Thread 0 read #2 start.
+Mutex locked
+Mutex unlocked
+Thread 0 read #2 end.
+Thread 0 read #3 start.
+Mutex locked
+Mutex unlocked
+Thread 0 read #3 end.
+Mutex locked
+Thread 0 read #4 start.
+Mutex locked
+Mutex unlocked
+Thread 1 read #3 end.
+Thread 1 read #4 start.
+Mutex locked
+Mutex unlocked
+Mutex unlocked
+Thread 1 read #4 end.
+Thread 1 read #5 start.
+Mutex locked
+Mutex unlocked
+Thread 1 read #5 end.
+Thread 0 read #4 end.
+Thread 0 read #5 start.
+Mutex locked
+Mutex unlocked
+Thread 3 write #3 end.
+Thread 3 write #4 start.
+Mutex locked
+Mutex unlocked
+Thread 3 write #4 end.
+Thread 3 write #5 start.
+Mutex locked
+Mutex unlocked
+Thread 3 write #5 end.
+Mutex locked
+Mutex unlocked
+Thread 2 write #1 end.
+Thread 2 write #2 start.
+Mutex locked
+Mutex unlocked
+Thread 2 write #2 end.
+Thread 2 write #3 start.
+Mutex locked
+Mutex unlocked
 Thread 0 read #5 end.
-Thread 0 write #5 start.
-Thread 0 write #5 end.
-Thread 0 read #6 start.
-Thread 0 read #6 end.
-Thread 0 write #6 start.
-Thread 0 write #6 end.
-Thread 0 read #7 start.
-Thread 0 read #7 end.
+Mutex locked
+Mutex unlocked
+Thread 2 write #3 end.
+Thread 2 write #4 start.
+Mutex locked
+Mutex unlocked
+Thread 2 write #4 end.
+Thread 2 write #5 start.
+Mutex locked
+Mutex unlocked
+Thread 2 write #5 end.
+
 ```
 
-As seen in the console result, once thread 0 is doing an operation, the thread 1 can start the operation but cannot finish the operation until thread 0 finishes the operation. Also, when a read operation is ongoing, write operation cannot begin, and vice versa.
+As seen in the console result, once thread x is doing an operation and locks the mutex, thread y can start the operation but cannot finish the operation until thread x finishes the operation and releases the mutex. Also, when a read operation is ongoing, write operation cannot begin, and vice versa. Read the `Couple thought process I want to highlight` on the possible reasons why I observe mutex being locked twice consecutively.
 
 ### Mimicking low-level functions ###
 
@@ -210,7 +259,8 @@ This is where an EEPROM reset function would be present.
 - For `eeprom_read`, size of input buffer does not necessarily matter as it will be given by the user. Rather than storing the read values into a buf, the user can have it constantly written out on a console. I just used a read buffer of size 256 for easy testing purposes. When I tried using read buffer of size less than the `size` parameter, I got a "Stack smashing error", which is what I expected. For `eeprom_write`, however, the size of input buf matters a lot. If the size of input buf is larger than `size` parameter, only `size` number of bytes from input buf will be updated, which is what the user might not have intended. To remedy this, I just decided to throw out an error if the size of input buf is not same as `size`. I thought this was the best way of letting the user know. 
   - To get the size of input parameter, I used the `strlen` function, which might not be the best option in the real world as EEPROM data does not have any '\0' byte to help indicate the size. For a real world scenario, I would have resorted to different way of determining the size. One idea is to continuously read the input buf until I hit a `0xFF` value, which I know means "reset state."
 - I could have used bit-shifting rather than memcpy to make my functions more efficient (This is for Case #2~4).
-
+- Rather than placing my mutex_lock/unlock inside my ll functions, I added them inside each Cases, before I start my reading/writing sequences. This is to ensure that all the data are read before another consumer can start reading, rather than other consumer accidentally starting to read the data after I finish reading one page.
+- One of the reasons why I think I am observing two mutex locks back to back is because of the debug mode. Rather than calling the `pthread_mutex_lock` or `pthread_mutex_unlock` functions, I call a helper function that calls these functions. Maybe within that short period of program counter moving to that function, another thread might be starting its own mutex lock.
 
 
 

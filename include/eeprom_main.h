@@ -17,4 +17,7 @@ int main();
 
 void eeprom_read_test();
 void eeprom_write_test();
-void* thread_func(void *ptr);
+void *thread_func_0(void *vargp);
+void *thread_func_1(void *vargp);
+void *thread_func_2(void *vargp);
+void *thread_func_3(void *vargp);
