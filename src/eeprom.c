@@ -8,12 +8,16 @@
 
 #include "../include/eeprom.h"
 
+// Global mem_mutex that is being used by both eeprom_read and eeprom_write
+pthread_mutex_t mem_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /*
     This function reads from EEPROM memory and stores the read values
     into a character array given in the parameter. To fulfill all
     corner/edge cases, this function is divided into four big cases.
     The explanation of each case is given in README.md file.
+    When the read begins, it locks the mem_mutex and only unlocks when
+    the function returns.
     
     
     @param offset: Amount of offset from the beginning of EEPROM
@@ -27,18 +31,27 @@
 */
 int eeprom_read(uint32_t offset, int size, char *buf) {
 
+    // Lock memory mutex
+    pthread_mutex_lock(&mem_mutex);
+
     // Checking for input validity
     if (offset > EEPROM_SIZE) {
         printf("ERROR: Invalid offset value!\n");
+        // Unlock memory mutex
+        pthread_mutex_unlock(&mem_mutex);
         return -1;
     }
     if (size <= 0) {
         printf("ERROR: Invalid size value!\n");
+        // Unlock memory mutex
+        pthread_mutex_unlock(&mem_mutex);
         return -2;
     }
     // Checking for index out of bound
     if (offset + size > EEPROM_SIZE) {
         printf("ERROR: Index out of bound!\n"); 
+        // Unlock memory mutex
+        pthread_mutex_unlock(&mem_mutex);
         return -3;
     }
     
@@ -115,6 +128,9 @@ int eeprom_read(uint32_t offset, int size, char *buf) {
     
     // Ending the character array
     buf[size] = '\0';
+    
+    // Unlock memory mutex
+    pthread_mutex_unlock(&mem_mutex);
     return 0;
 }
 
@@ -124,6 +140,8 @@ int eeprom_read(uint32_t offset, int size, char *buf) {
     a character array in the parameter. To fulfill all
     corner/edge cases, this function is divided into four big cases.
     The explanation of each case is given in README.md file.
+    When the write begins, it locks the mem_mutex and only unlocks when
+    the function returns.
     
     
     @param offset: Amount of offset from the beginning of EEPROM
@@ -137,23 +155,35 @@ int eeprom_read(uint32_t offset, int size, char *buf) {
     @return: -4 for sizeof(buf) != size
 */
 int eeprom_write(uint32_t offset, int size, char *buf) {
+
+    // Lock memory mutex
+    pthread_mutex_lock(&mem_mutex);
+
     // Checking for input validity
     if (offset > EEPROM_SIZE) {
         printf("ERROR: Invalid offset value!\n");
+        // Unlock memory mutex
+        pthread_mutex_unlock(&mem_mutex);
         return -1;
     }
     if (size <= 0) {
         printf("ERROR: Invalid size value!\n");
+        // Unlock memory mutex
+        pthread_mutex_unlock(&mem_mutex);
         return -2;
     }
     // Checking for index out of bound
     if (offset + size > EEPROM_SIZE) {
         printf("ERROR: Index out of bound!\n"); 
+        // Unlock memory mutex
+        pthread_mutex_unlock(&mem_mutex);
         return -3;
     }
     // Checking the input buf size
     if (strlen(buf) != size) {
         printf("ERROR: Size of buf is different than the amount of size to be written!\n");
+        // Unlock memory mutex
+        pthread_mutex_unlock(&mem_mutex);
         return -4;
     }
     
@@ -232,6 +262,8 @@ int eeprom_write(uint32_t offset, int size, char *buf) {
         memset(temp, 0, PAGE_SIZE-1);
     }
     
+    // Unlock memory mutex
+    pthread_mutex_unlock(&mem_mutex);
     return 0;
     
 }

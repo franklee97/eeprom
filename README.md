@@ -132,6 +132,61 @@ The string to be written is defined by me. To test each cases, I used `memcpy` t
 
 This function is meant to reset the EEPROM. It calls a lowlevel reset function, which resets the EEPROM by slightly raising the voltage above normal "HIGH" level. I did not implement this function as this would be a bit outside the scope of the prompt.
 
+### Using mutexes to limit concurrent hardware access ###
+Because this code must mimic EEPROM behavior, I needed to incorporate the case of multiple consumers trying to access the resource. To limit the access to the hardware while an operation is ongoing, I used mutexes. As soon as `eeprom_read()` or `eeprom_write()` function would start, it would lock a global, common(between read/write) mutex so another consumer cannot access it. It then unlocks the mutex right before the function exits, either via a successful read/write or via an error. My code has common mutex, meaning while consumer A is reading OR writing, consumer B can do neither operation.
+
+### Testing concurrent hardware access ###
+To test the concurrent access, I utilized multithreading. First I created two threads that does the same thing: read from one place and write to another place. Then, using print statements right before and right after the functions, I observed the behavior. Below is an example of the test:
+
+```
+----Starting mutex test----
+Thread 1 read #0 start.
+Thread 0 read #0 start.
+Thread 1 read #0 end.
+Thread 1 write #0 start.
+Thread 1 write #0 end.
+Thread 1 read #1 start.
+Thread 1 read #1 end.
+Thread 1 write #1 start.
+Thread 0 read #0 end.
+Thread 0 write #0 start.
+Thread 0 write #0 end.
+Thread 0 read #1 start.
+Thread 0 read #1 end.
+Thread 0 write #1 start.
+Thread 0 write #1 end.
+Thread 0 read #2 start.
+Thread 0 read #2 end.
+Thread 0 write #2 start.
+Thread 0 write #2 end.
+Thread 0 read #3 start.
+Thread 0 read #3 end.
+Thread 0 write #3 start.
+Thread 0 write #3 end.
+Thread 0 read #4 start.
+Thread 0 read #4 end.
+Thread 0 write #4 start.
+Thread 0 write #4 end.
+Thread 1 write #1 end.
+Thread 1 read #2 start.
+Thread 0 read #5 start.
+Thread 1 read #2 end.
+Thread 1 write #2 start.
+Thread 1 write #2 end.
+Thread 1 read #3 start.
+Thread 0 read #5 end.
+Thread 0 write #5 start.
+Thread 0 write #5 end.
+Thread 0 read #6 start.
+Thread 0 read #6 end.
+Thread 0 write #6 start.
+Thread 0 write #6 end.
+Thread 0 read #7 start.
+Thread 0 read #7 end.
+```
+
+As seen in the console result, once thread 0 is doing an operation, the thread 1 can start the operation but cannot finish the operation until thread 0 finishes the operation.
+
 ### Mimicking low-level functions ###
 
 I used File IO from `<stdio.h>` to mimic the low-level function behaviors. 
