@@ -37,6 +37,7 @@ eeprom
 
 ## List of assumptions I made ##
 - `offset` and `size` variables are in bytes
+- Read and Write operations require one hardware line, meaning I cannot read while writing.
 
 
 ## Code explained ##
