@@ -34,25 +34,10 @@ int eeprom_read(uint32_t offset, int size, char *buf) {
     // Lock memory mutex
     pthread_mutex_lock(&mem_mutex);
 
-    // Checking for input validity
-    if (offset > EEPROM_SIZE) {
-        printf("ERROR: Invalid offset value!\n");
-        // Unlock memory mutex
-        pthread_mutex_unlock(&mem_mutex);
-        return -1;
-    }
-    if (size <= 0) {
-        printf("ERROR: Invalid size value!\n");
-        // Unlock memory mutex
-        pthread_mutex_unlock(&mem_mutex);
-        return -2;
-    }
-    // Checking for index out of bound
-    if (offset + size > EEPROM_SIZE) {
-        printf("ERROR: Index out of bound!\n"); 
-        // Unlock memory mutex
-        pthread_mutex_unlock(&mem_mutex);
-        return -3;
+    // Checking input validity
+    int param_check = eeprom_param_check(offset, size);
+    if (param_check != 0) {
+        return param_check;
     }
     
     // Incrementer
@@ -160,24 +145,9 @@ int eeprom_write(uint32_t offset, int size, char *buf) {
     pthread_mutex_lock(&mem_mutex);
 
     // Checking for input validity
-    if (offset > EEPROM_SIZE) {
-        printf("ERROR: Invalid offset value!\n");
-        // Unlock memory mutex
-        pthread_mutex_unlock(&mem_mutex);
-        return -1;
-    }
-    if (size <= 0) {
-        printf("ERROR: Invalid size value!\n");
-        // Unlock memory mutex
-        pthread_mutex_unlock(&mem_mutex);
-        return -2;
-    }
-    // Checking for index out of bound
-    if (offset + size > EEPROM_SIZE) {
-        printf("ERROR: Index out of bound!\n"); 
-        // Unlock memory mutex
-        pthread_mutex_unlock(&mem_mutex);
-        return -3;
+    int param_check = eeprom_param_check(offset, size);
+    if (param_check != 0) {
+        return param_check;
     }
     // Checking the input buf size
     if (strlen(buf) != size) {
@@ -274,4 +244,29 @@ int eeprom_write(uint32_t offset, int size, char *buf) {
 */
 void eeprom_reset() {
     ll_eeprom_reset();
+}
+
+
+int eeprom_param_check(uint32_t offset, int size) {
+    // Checking for input validity
+    if (offset > EEPROM_SIZE) {
+        printf("ERROR: Invalid offset value!\n");
+        // Unlock memory mutex
+        pthread_mutex_unlock(&mem_mutex);
+        return -1;
+    }
+    if (size <= 0) {
+        printf("ERROR: Invalid size value!\n");
+        // Unlock memory mutex
+        pthread_mutex_unlock(&mem_mutex);
+        return -2;
+    }
+    // Checking for index out of bound
+    if (offset + size > EEPROM_SIZE) {
+        printf("ERROR: Index out of bound!\n"); 
+        // Unlock memory mutex
+        pthread_mutex_unlock(&mem_mutex);
+        return -3;
+    }
+    return 0;
 }
