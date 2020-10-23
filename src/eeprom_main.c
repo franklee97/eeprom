@@ -24,10 +24,13 @@ int main() {
     pthread_t tid[2];
     int i;
     for (i = 0; i < 2; i++) {
-        pthread_create(&tid[i], NULL, thread_func, (void *)i);
+        pthread_create(&tid[i], NULL, thread_func, (void *)(intptr_t)i);
     }
     
-    while (1) {}    // Wait until mutex finishes
+    
+    pthread_join(tid[0], NULL);
+    pthread_join(tid[1], NULL);
+    //while (1) {}    // Wait until mutex finishes
 
     return 0;
 }
@@ -35,7 +38,7 @@ int main() {
 int t_count[2];
 
 void *thread_func(void *vargp) {
-    int myid = (int) vargp;     // Thread id
+    int myid = (intptr_t) vargp;     // Thread id
     char out[256];
     
     // Continue until both threads have done 5 read/writes
@@ -49,6 +52,7 @@ void *thread_func(void *vargp) {
         t_count[myid]++;
         
     }
+    return NULL;
 }
 
 
