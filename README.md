@@ -185,7 +185,7 @@ Thread 0 read #7 start.
 Thread 0 read #7 end.
 ```
 
-As seen in the console result, once thread 0 is doing an operation, the thread 1 can start the operation but cannot finish the operation until thread 0 finishes the operation.
+As seen in the console result, once thread 0 is doing an operation, the thread 1 can start the operation but cannot finish the operation until thread 0 finishes the operation. Also, when a read operation is ongoing, write operation cannot begin, and vice versa.
 
 ### Mimicking low-level functions ###
 
