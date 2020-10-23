@@ -31,9 +31,6 @@ pthread_mutex_t mem_mutex = PTHREAD_MUTEX_INITIALIZER;
 */
 int eeprom_read(uint32_t offset, int size, char *buf) {
 
-    // Lock memory mutex
-    pthread_mutex_lock(&mem_mutex);
-
     // Checking input validity
     int param_check = eeprom_param_check(offset, size);
     if (param_check != 0) {
@@ -53,9 +50,13 @@ int eeprom_read(uint32_t offset, int size, char *buf) {
     if (offset % PAGE_SIZE == 0 && size % PAGE_SIZE == 0) {
         // Because size is a multiple of PAGE_SIZE, size/PAGE_SIZE is number of page reads
         num_page = size/PAGE_SIZE;
+        // Lock memory mutex
+        pthread_mutex_lock(&mem_mutex);
         for (i = 0; i < num_page; i++) {
             ll_read(offset + i*PAGE_SIZE, buf + i*PAGE_SIZE); // Copying the read bytes into buf
         }
+        // Unlock memory mutex
+        pthread_mutex_unlock(&mem_mutex);
     }
     
     // Case #2: offset is multiple of PAGE_SIZE and size is not multiple of PAGE_SIZE
@@ -63,17 +64,23 @@ int eeprom_read(uint32_t offset, int size, char *buf) {
         // The number of page reads is the truncated value of size, which is still
         // size/PAGE_SIZE
         num_page = size/PAGE_SIZE;
+        // Lock memory mutex
+        pthread_mutex_lock(&mem_mutex);
         for (i = 0; i < num_page; i++) {
             ll_read(offset + i*PAGE_SIZE, buf + i*PAGE_SIZE); // Copying the read bytes into buf
         }
         // Reading the remaining bytes
         ll_read((i+offset/PAGE_SIZE)*PAGE_SIZE, temp);    // Reading entire page
+        // Unlock memory mutex
+        pthread_mutex_unlock(&mem_mutex);
         memcpy(buf + i*PAGE_SIZE, temp, size%PAGE_SIZE);  // Storing only desired bytes from the page
         memset(temp, 0, PAGE_SIZE-1);    // Clear temp array
     }
     
     // Case #3: offset is not a multiple of PAGE_SIZE and offset+size is multiple of PAGE_SIZE
     else if (offset % PAGE_SIZE != 0 && (offset+size) % PAGE_SIZE == 0) {
+        // Lock memory mutex
+        pthread_mutex_lock(&mem_mutex);
         ll_read((offset/PAGE_SIZE)*PAGE_SIZE, temp);  // Reading the floor(offset)'th page
         memcpy(buf, temp+(offset%PAGE_SIZE), PAGE_SIZE-(offset%PAGE_SIZE));  // Storing only desired bytes
         memset(temp, 0, PAGE_SIZE-1);    // Clear temp array
@@ -86,10 +93,14 @@ int eeprom_read(uint32_t offset, int size, char *buf) {
             ll_read(j*PAGE_SIZE, buf+(PAGE_SIZE-(offset%PAGE_SIZE))+(i*PAGE_SIZE));
             j++;
         }
+        // Unlock memory mutex
+        pthread_mutex_unlock(&mem_mutex);
     }
     
     // Case #4: offset is not multiple of PAGE_SIZE and offset+size is not multiple of PAGE_SIZE
     else if (offset % PAGE_SIZE != 0 && size % PAGE_SIZE != 0) {
+        // Lock memory mutex
+        pthread_mutex_lock(&mem_mutex);
         // Same behavior as above to read first couple bytes
         ll_read((offset/PAGE_SIZE)*PAGE_SIZE, temp);
         memcpy(buf, temp+(offset%PAGE_SIZE), PAGE_SIZE-(offset%PAGE_SIZE));
@@ -106,6 +117,8 @@ int eeprom_read(uint32_t offset, int size, char *buf) {
         
         // Do one more page read after where we left off
         ll_read(j*PAGE_SIZE, temp);
+        // Unlock memory mutex
+        pthread_mutex_unlock(&mem_mutex);
         // Storing only desired bytes
         memcpy(buf+(i*PAGE_SIZE)+(PAGE_SIZE-(offset%PAGE_SIZE)), temp, (offset+size)%PAGE_SIZE);
         memset(temp, 0, PAGE_SIZE-1);
@@ -113,9 +126,6 @@ int eeprom_read(uint32_t offset, int size, char *buf) {
     
     // Ending the character array
     buf[size] = '\0';
-    
-    // Unlock memory mutex
-    pthread_mutex_unlock(&mem_mutex);
     return 0;
 }
 
@@ -141,8 +151,7 @@ int eeprom_read(uint32_t offset, int size, char *buf) {
 */
 int eeprom_write(uint32_t offset, int size, char *buf) {
 
-    // Lock memory mutex
-    pthread_mutex_lock(&mem_mutex);
+    
 
     // Checking for input validity
     int param_check = eeprom_param_check(offset, size);
@@ -170,9 +179,13 @@ int eeprom_write(uint32_t offset, int size, char *buf) {
     if (offset % PAGE_SIZE == 0 && size % PAGE_SIZE == 0) {
         // Because size is a multiple of PAGE_SIZE, size/PAGE_SIZE is number of page writes
         num_page = size/PAGE_SIZE;
+        // Lock memory mutex
+        pthread_mutex_lock(&mem_mutex);
         for (i = 0; i < num_page; i++) {
             ll_write(offset + i*PAGE_SIZE, buf + i*PAGE_SIZE); // Write the bytes
         }
+        // Unlock memory mutex
+        pthread_mutex_unlock(&mem_mutex);
     }
     
     // Case #2: offset is multiple of PAGE_SIZE and size is not multiple of PAGE_SIZE
@@ -180,11 +193,15 @@ int eeprom_write(uint32_t offset, int size, char *buf) {
         // The number of page writes is the truncated value of size, which is still
         // size/PAGE_SIZE
         num_page = size/PAGE_SIZE;
+        // Lock memory mutex
+        pthread_mutex_lock(&mem_mutex);
         for (i = 0; i < num_page; i++) {
             ll_write(offset + i*PAGE_SIZE, buf + i*PAGE_SIZE); // Write the bytes
         }
         // Writing the remaining bytes
         ll_read((i+offset/PAGE_SIZE)*PAGE_SIZE, temp);      // Read entire page to temp
+        // Unlock memory mutex
+        pthread_mutex_unlock(&mem_mutex);
         memcpy(temp, buf + i*PAGE_SIZE, size%PAGE_SIZE);    // Overwriting portion of temp with remaining bytes
         ll_write((i+offset/PAGE_SIZE)*PAGE_SIZE, temp);     // Copy the updated page back
         memset(temp, 0, PAGE_SIZE-1);    // Clear temp array
@@ -192,6 +209,8 @@ int eeprom_write(uint32_t offset, int size, char *buf) {
     
     // Case #3: offset is not a multiple of PAGE_SIZE and offset+size is multiple of PAGE_SIZE
     else if (offset % PAGE_SIZE != 0 && (offset+size) % PAGE_SIZE == 0) {
+        // Lock memory mutex
+        pthread_mutex_lock(&mem_mutex);
         ll_read((offset/PAGE_SIZE)*PAGE_SIZE, temp);    // Reading the floor(offset)'th page
         memcpy(temp+(offset%PAGE_SIZE), buf, PAGE_SIZE-(offset%PAGE_SIZE));     // Overwriting portion of temp
         ll_write((offset/PAGE_SIZE)*PAGE_SIZE, temp);   // Copy the updated page back
@@ -205,10 +224,14 @@ int eeprom_write(uint32_t offset, int size, char *buf) {
             ll_write(j*PAGE_SIZE, buf+(PAGE_SIZE-(offset%PAGE_SIZE))+(i*PAGE_SIZE));
             j++;
         }
+        // Unlock memory mutex
+        pthread_mutex_unlock(&mem_mutex);
     }
     
     // Case #4: offset is not multiple of PAGE_SIZE and offset+size is not multiple of PAGE_SIZE
     else if (offset % PAGE_SIZE != 0 && size % PAGE_SIZE != 0) {
+        // Lock memory mutex
+        pthread_mutex_lock(&mem_mutex);
         // Same behavior as above to write first couple bytes
         ll_read((offset/PAGE_SIZE)*PAGE_SIZE, temp);
         memcpy(temp+(offset%PAGE_SIZE), buf, PAGE_SIZE-(offset%PAGE_SIZE));
@@ -226,14 +249,14 @@ int eeprom_write(uint32_t offset, int size, char *buf) {
         
         // Do one more page write after where we left off
         ll_read(j*PAGE_SIZE, temp);
+        // Unlock memory mutex
+        pthread_mutex_unlock(&mem_mutex);
         // Storing only desired bytes
         memcpy(temp, buf+(i*PAGE_SIZE)+(PAGE_SIZE-(offset%PAGE_SIZE)), (offset+size)%PAGE_SIZE);
         ll_write(j*PAGE_SIZE, temp);        // Updating the new page
         memset(temp, 0, PAGE_SIZE-1);
     }
     
-    // Unlock memory mutex
-    pthread_mutex_unlock(&mem_mutex);
     return 0;
     
 }

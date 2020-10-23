@@ -11,20 +11,12 @@
 
 
 int main() {
-    clock_t start_t, end_t;
-    
-    start_t = clock();
-    printf("Starting program = %ld\n", start_t);
+
     eeprom_read_test();     // eeprom_read test
-    
 
     eeprom_reset();
 
-
     eeprom_write_test();    // eeprom_write test
-    
-    end_t = clock();
-    printf("Ending program = %ld\n", end_t);
     
     
     printf("----Starting mutex test----\n");
@@ -45,7 +37,6 @@ int t_count[2];
 void *thread_func(void *vargp) {
     int myid = (int) vargp;     // Thread id
     char out[256];
-    int j;
     
     // Continue until both threads have done 5 read/writes
     while (t_count[0] < 5 || t_count[1] < 5) {

@@ -9,7 +9,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <pthread.h>
-#include <time.h>
 
 #include "../include/eeprom.h"
 #include "../include/ll_func.h"
